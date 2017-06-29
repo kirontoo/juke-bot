@@ -19,7 +19,7 @@ bot.login(token.bToken);
 
 bot.on('ready', () => {
     console.log('bot logged in');
-})
+});
 
 bot.on('message', (msg) => {
     if(!msg.guild) return;
@@ -39,33 +39,30 @@ const commands = {
         const song = msg.content.split(' ').slice(1).join(" ");
 
         if(!song) return msg.reply('Hey, I need a song first.');
-
         if(!msg.member.voiceChannel) return msg.reply('Dude, get in the jukebox voice channel.');
-        if(msg.member.voiceChannel.name !== token.jukeboxVoice) return msg.reply('Hello? Jukebox voice channel');
+        if(msg.member.voiceChannel.name !== token.jukeboxVoice) return msg.reply('Hello? Jukebox voice channel.');
 
-        if(msg.member.voiceChannel.name === token.jukeboxVoice) {
-            if(queue.length > 0 || isPlaying) {
-                getId(song).then( (id) => {
-                    addQueue(id);
-                    fetchVideoInfo(id).then( (videoInfo) => {
-                        songsInQueue.push(videoInfo.title);
-                        msg.reply(`Added **${videoInfo.title}** to queue`);
-                    });
+        if(queue.length > 0 || isPlaying) {
+            getId(song).then( (id) => {
+                addQueue(id);
+                fetchVideoInfo(id).then( (videoInfo) => {
+                    songsInQueue.push(videoInfo.title);
+                    msg.reply(`Added **${videoInfo.title}** to queue`);
+                });
 
-                }).catch( (err) => {
-                    msg.reply(`Sorry! Can\'t find ${song}.`);
-                });
-            } else {
-                getId(song).then( (id) => {
-                    queue.push('placeholder');
-                    songsInQueue.push('placeholder');
-                    playMusic(id, msg);
-                    msg.reply(`k. Give me a sec.`);
-                }).catch( (err) => {
-                    console.log(err);
-                    msg.reply(`Sorry! Can\'t find ${song}.`);
-                });
-            }
+            }).catch( (err) => {
+                msg.reply(`Sorry! Can\'t find ${song}.`);
+            });
+        } else {
+            getId(song).then( (id) => {
+                queue.push('placeholder');
+                songsInQueue.push('placeholder');
+                playMusic(id, msg);
+                msg.reply(`k. Give me a sec.`);
+            }).catch( (err) => {
+                console.log(err);
+                msg.reply(`Sorry! Can\'t find ${song}.`);
+            });
         }
     },
 
@@ -85,7 +82,6 @@ const commands = {
               {
                   "name": "play",
                   "value": "Use '!play' followed by a song and artist or a youtube link to play the song."
-
               }, {
                   "name": "next",
                   "value": "Play the next song.",
@@ -121,6 +117,7 @@ const commands = {
     },
 
     'song': (msg) => {
+        if(!isPlaying) return msg.reply('Hm? Nothing\'s playing right now.');
         msg.reply(`Now playing **${nowPlaying}**`);
     },
 
