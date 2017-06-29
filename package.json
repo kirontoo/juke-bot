@@ -1,0 +1,23 @@
+{
+  "name": "juke-bot",
+  "version": "1.0.0",
+  "description": "A discord bot that streams music in voice channels",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "engines": {
+    "node": "8.1.0"
+  },
+  "author": "Amy Dang",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.16.2",
+    "discord.js": "^11.1.0",
+    "ffmpeg-binaries": "^3.2.2",
+    "node-opus": "^0.2.6",
+    "opusscript": "0.0.3",
+    "youtube-info": "^1.1.1",
+    "ytdl-core": "^0.14.4"
+  }
+}
