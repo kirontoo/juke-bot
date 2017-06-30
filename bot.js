@@ -37,24 +37,15 @@ const commands = {
     'play': (msg) => {
         const song = msg.content.split(' ').slice(1).join(" ");
 
-        if(!song) return msg.reply('Hey, I need a song first.');
+        if(!song && queue.length === 0) return msg.reply('Hey, I need a song first.');
         if(!msg.member.voiceChannel) return msg.reply('Dude, get in the jukebox voice channel.');
         if(msg.member.voiceChannel.name !== token.jukeboxVoice) return msg.reply('Hello? Jukebox voice channel.');
+        if(!song && queue.length > 0) return playMusic(queue[0], msg);
 
         if(queue.length > 0 || isPlaying) {
-            getId(song).then( (id) => {
-                queue.push(id);
-                fetchVideoInfo(id).then( (videoInfo) => {
-                    songsInQueue.push(videoInfo.title);
-                    msg.reply(`Added **${videoInfo.title}** to queue`);
-                });
-            }).catch( (err) => {
-                msg.reply(`Sorry! Can\'t find ${song}.`);
-            });
+            commands.add(msg, song);
         } else {
             getId(song).then( (id) => {
-                queue.push('placeholder');
-                songsInQueue.push('placeholder');
                 playMusic(id, msg);
                 msg.reply(`k. Give me a sec.`);
             }).catch( (err) => {
@@ -64,6 +55,21 @@ const commands = {
         }
     },
 
+    'add': (msg, song) => {
+        song = msg.content.split(' ').slice(1).join(" ");
+        if(!song && queue.length > 0) return msg.reply('I can\'t add songs to the queue, if you dont\'t give me something to work with.');
+
+        getId(song).then( (id) => {
+            queue.push(id);
+            fetchVideoInfo(id).then( (videoInfo) => {
+                songsInQueue.push(videoInfo.title);
+                msg.reply(`Added **${videoInfo.title}** to queue`);
+            });
+        }).catch( (err) => {
+            msg.reply(`Sorry! Can\'t find ${song}.`);
+        });
+    },
+
     'song': (msg) => {
         if(!isPlaying) return msg.reply('Hm? Nothing\'s playing right now.');
         msg.reply(`Now playing **${nowPlaying}**`);
@@ -71,21 +77,20 @@ const commands = {
 
     'stop': (msg) => {
         if(!isPlaying) return msg.reply('?? I\'m not streaming anything.');
-        if(dispatcher.pause) {
-            msg.channel.send('Fiiine. I\'ll stop streaming.');
-            stopStream = true;
-            isPlaying = false;
-            dispatcher.end();
-        }
+        msg.channel.send('Fiiine. I\'ll stop streaming.');
+        stopStream = true;
+        isPlaying = false;
+        dispatcher.end();
     },
 
     'pause': (msg) => {
         if(!isPlaying) return msg.reply('Sry, I can\'t pause life.');
-        if(dispatcher.pause){
+        if(!dispatcher.paused){
             msg.channel.send('Alright, alright I\'ll pause the music.');
             dispatcher.pause();
             return;
         }
+        msg.channel.send('Dude, I already paused the music.');
     },
 
     'resume': (msg) => {
@@ -95,11 +100,12 @@ const commands = {
             dispatcher.resume();
             return;
         }
+        msg.channel.send('Did you mean \'!pause\'? Cus I\'m still playing music.');
     },
 
     'next': (msg) => {
         if(!isPlaying) return msg.reply('Uhh, I cant\'t skip if there\'s nothing playing. :p');
-        if(queue.length > 0 || isPlaying){
+        if(queue.length > 0 || isPlaying) {
             msg.channel.send(`Aw, come on. It\'s a great song. Fine. Skipping the current song: **${nowPlaying}**`);
             dispatcher.end();
         }
@@ -107,11 +113,14 @@ const commands = {
 
     'queue': (msg) => {
         if(!isPlaying) return msg.reply('I\'m not streaming right now.');
-        if(songsInQueue.length === 0) {
-            return msg.reply(`Looks empty. Add a song with '!play'.`);
-        }
+        if(songsInQueue.length === 0) return msg.reply(`Looks empty. Add a song with '!play' or '!add'.`);
         let songs = songsInQueue.join(', ');
         msg.reply(`Playing next: ${songs}`);
+    },
+
+    'time': (msg) => {
+        if(!isPlaying) return msg.channel.send('0. I\'m not streaming.');
+        msg.channel.send(`Time elapsed: ${Math.floor(dispatcher.time / 60000)}:${(dispatcher.time % 60000)/1000 <10 ? '0' + (dispatcher.time % 60000)/1000 : (dispatcher.time % 60000)/1000}`);
     },
 
     'help': (msg) => {
@@ -130,6 +139,10 @@ const commands = {
               {
                   "name": "play",
                   "value": "Use '!play' followed by a song and artist or a youtube link to play the song."
+              }, {
+                  "name": "add",
+                  "value": "Add a song to the queue. Remember to include a song or a youtube link.",
+                  "inline": true
               }, {
                   "name": "next",
                   "value": "Play the next song.",
@@ -154,8 +167,11 @@ const commands = {
                 "name": "queue",
                 "value": "Find out what's in the queue.",
                 "inline": true
-
-            }, {
+              }, {
+                "name": "time",
+                "value": "Find out how long this song has been playing for.",
+                "inline": true
+              }, {
                 "name": "help",
                 "value": "View all commands.",
                 "inline": true
@@ -191,7 +207,7 @@ const getYoutubeId = (song) => {
             reject('Unable to find youtube id.');
         }
     })
-}
+};
 
 const getId = async (song) => {
     if(isYoutube(song)) {
@@ -200,7 +216,7 @@ const getId = async (song) => {
     }
     let id = await findVideo(song);
     return id;
-}
+};
 
 const playMusic = (id, msg) => {
     voiceChannel = msg.member.voiceChannel;
@@ -234,4 +250,4 @@ const playMusic = (id, msg) => {
             }
         })
     }).catch(console.log);
-}
+};
