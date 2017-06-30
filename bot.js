@@ -11,7 +11,6 @@ var nowPlaying = '';
 var isPlaying = false;
 var dispatcher = null;
 var voiceChannel = null;
-var stream = null;
 var stopStream = false;
 var songsInQueue = [];
 
@@ -44,12 +43,11 @@ const commands = {
 
         if(queue.length > 0 || isPlaying) {
             getId(song).then( (id) => {
-                addQueue(id);
+                queue.push(id);
                 fetchVideoInfo(id).then( (videoInfo) => {
                     songsInQueue.push(videoInfo.title);
                     msg.reply(`Added **${videoInfo.title}** to queue`);
                 });
-
             }).catch( (err) => {
                 msg.reply(`Sorry! Can\'t find ${song}.`);
             });
@@ -64,6 +62,56 @@ const commands = {
                 msg.reply(`Sorry! Can\'t find ${song}.`);
             });
         }
+    },
+
+    'song': (msg) => {
+        if(!isPlaying) return msg.reply('Hm? Nothing\'s playing right now.');
+        msg.reply(`Now playing **${nowPlaying}**`);
+    },
+
+    'stop': (msg) => {
+        if(!isPlaying) return msg.reply('?? I\'m not streaming anything.');
+        if(dispatcher.pause) {
+            msg.channel.send('Fiiine. I\'ll stop streaming.');
+            stopStream = true;
+            isPlaying = false;
+            dispatcher.end();
+        }
+    },
+
+    'pause': (msg) => {
+        if(!isPlaying) return msg.reply('Sry, I can\'t pause life.');
+        if(dispatcher.pause){
+            msg.channel.send('Alright, alright I\'ll pause the music.');
+            dispatcher.pause();
+            return;
+        }
+    },
+
+    'resume': (msg) => {
+        if(!isPlaying) return msg.reply('Resume? Resume what?');
+        if(dispatcher.paused){
+            msg.channel.send(`Woo! Continue playing **${nowPlaying}**.`);
+            dispatcher.resume();
+            return;
+        }
+    },
+
+    'next': (msg) => {
+        if(!isPlaying) return msg.reply('Uhh, I cant\'t skip if there\'s nothing playing. :p');
+        if(queue.length > 0 || isPlaying){
+            msg.channel.send(`Aw, come on. It\'s a great song. Fine. Skipping the current song: **${nowPlaying}**`);
+            dispatcher.end();
+        }
+    },
+
+    'queue': (msg) => {
+        if(!isPlaying) return msg.reply('I\'m not streaming right now.');
+        if(songsInQueue.length === 0) {
+            return msg.reply(`Looks empty. Add a song with '!play'.`);
+        }
+        let songs = songsInQueue.join(', ');
+        msg.reply(`Playing next: ${songs}`);
     },
 
     'help': (msg) => {
@@ -114,57 +162,6 @@ const commands = {
             }
             ]
         }});
-    },
-
-    'song': (msg) => {
-        if(!isPlaying) return msg.reply('Hm? Nothing\'s playing right now.');
-        msg.reply(`Now playing **${nowPlaying}**`);
-    },
-
-    'stop': (msg) => {
-        if(!isPlaying) return msg.reply('?? I\'m not streaming anything.');
-        if(dispatcher.pause) {
-            msg.channel.send('Fiiine. I\'ll stop streaming.');
-            stopStream = true;
-            dispatcher.end();
-            isPlaying = false;
-            voiceChannel.leave();
-        }
-    },
-
-    'pause': (msg) => {
-        if(!isPlaying) return msg.reply('Sry, I can\'t pause life.');
-        if(dispatcher.pause){
-            msg.channel.send('Alright, alright I\'ll pause the music.');
-            dispatcher.pause();
-            return;
-        }
-    },
-
-    'resume': (msg) => {
-        if(!isPlaying) return msg.reply('Resume? Resume what?');
-        if(dispatcher.paused){
-            msg.channel.send(`Yessss! Continue playing **${nowPlaying}**.`);
-            dispatcher.resume();
-            return;
-        }
-    },
-
-    'next': (msg) => {
-        if(!isPlaying) return msg.reply('Uhh, I cant\'t skip if there\'s nothing playing. :p');
-        if(queue.length > 0 || isPlaying){
-            msg.channel.send(`Aw, come on. It\'s a great song. Fine. Skipping the current song: **${nowPlaying}**`);
-            dispatcher.end();
-        }
-    },
-
-    'queue': (msg) => {
-        if(!isPlaying) return msg.reply('I\'m not streaming right now.');
-        if(songsInQueue.length === 0) {
-            return msg.reply(`Looks empty. Add a song with '!play'.`);
-        }
-        songs = songsInQueue.join(', ');
-        msg.reply(`Playing next: ${songs}`);
     }
 };
 
@@ -183,11 +180,6 @@ const findVideo = async (song) => {
 };
 
 const isYoutube = (str) =>  str.toLowerCase().indexOf('youtube.com') > -1;
-
-const addQueue = (vidId) => {
-    if(isYoutube(vidId)) return queue.push(getId());
-    queue.push(vidId);
-}
 
 const getYoutubeId = (song) => {
     return new Promise( (resolve, reject) => {
@@ -212,37 +204,34 @@ const getId = async (song) => {
 
 const playMusic = (id, msg) => {
     voiceChannel = msg.member.voiceChannel;
-    if(voiceChannel) {
-        voiceChannel.join().then( (connection) => {
-            stream = ytdl(`https://www.youtube.com/watc?v=${id}`, {filter: 'audioonly'})
-            dispatcher = connection.playStream(stream);
-            dispatcher.on('start', () => {
-                fetchVideoInfo(id).then((videoInfo) => {
-                    msg.channel.send(`Now playing: **${videoInfo.title}**`);
-                    nowPlaying = videoInfo.title;
-                    isPlaying = true;
-                    songsInQueue.shift();
-                    queue.shift();
-                });
-            })
-            dispatcher.on('error', (e) => {
-                console.log(e);
-                msg.channel.send('Oops, there\'s been an error. Go tell Amy...if she\'s not too lazy to fix it...')
+    voiceChannel.join().then( (connection) => {
+        const stream = ytdl(`https://www.youtube.com/watc?v=${id}`, {filter: 'audioonly'})
+        dispatcher = connection.playStream(stream);
+        dispatcher.on('start', () => {
+            fetchVideoInfo(id).then((videoInfo) => {
+                msg.channel.send(`Now playing: **${videoInfo.title}**`);
+                nowPlaying = videoInfo.title;
+                isPlaying = true;
+                songsInQueue.shift();
+                queue.shift();
             });
-            dispatcher.on('end', () => {
-                if(queue.length === 0) {
-                    queue = [];
-                    songsInQueue = [];
-                    isPlaying = false;
-                    voiceChannel.leave();
-                    if(!stopStream) return msg.channel.send('Oh, there\'s no more songs. Cya.');
-                    stopStream = false;
-                } else {
-                    playMusic(queue[0], msg);
-                }
-            })
-        }).catch(console.log);
-    } else {
-        msg.reply('Make sure you\'re in the jukebox voice channel!');
-    }
+        });
+        dispatcher.on('error', (e) => {
+            console.log(e);
+            msg.channel.send('Oops, there\'s been an error. Contact Amy.')
+        });
+        dispatcher.on('end', () => {
+            if(queue.length === 0 || !isPlaying) {
+                queue = [];
+                songsInQueue = [];
+                isPlaying = false;
+                voiceChannel.leave();
+                if(!stopStream) msg.channel.send('Oh, there\'s no more songs. Cya.');
+                stopStream = false;
+                return;
+            } else {
+                playMusic(queue[0], msg);
+            }
+        })
+    }).catch(console.log);
 }
