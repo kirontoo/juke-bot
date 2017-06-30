@@ -155,9 +155,6 @@ const commands = {
         if(queue.length > 0 || isPlaying){
             msg.channel.send(`Aw, come on. It\'s a great song. Fine. Skipping the current song: **${nowPlaying}**`);
             dispatcher.end();
-            if(queue.length === 0){
-                msg.channel.send('Oh, There\'s no more songs. Cya.');
-            }
         }
     },
 
@@ -238,7 +235,7 @@ const playMusic = (id, msg) => {
                     songsInQueue = [];
                     isPlaying = false;
                     voiceChannel.leave();
-                    if(!stopStream) return msg.channel.send('Huh, no more songs to play.');
+                    if(!stopStream) return msg.channel.send('Oh, there\'s no more songs. Cya.');
                     stopStream = false;
                 } else {
                     playMusic(queue[0], msg);
